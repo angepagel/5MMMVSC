@@ -1,0 +1,171 @@
+Correction of the Token Ring lab session up to section 5
+********************************************************
+
+Section 2
+---------
+
+The LTS of the service is as folows:
+
+	States: 0, 1, 2, 3
+	Transitions:	0 --OPEN(A1)--> 1
+			0 --OPEN(A2)--> 2
+			0 --OPEN(A3)--> 3
+			1 --CLOSE(A1)--> 0
+			2 --CLOSE(A2)--> 0
+			3 --CLOSE(A3)--> 0
+
+It can be generated automatically using the following command of CADP:
+lnt.open SERVICE.lnt generator SERVICE.bcg
+
+The resulting graph can be visualized using the following command:
+bcg_edit SERVICE.bcg
+
+Section 3
+---------
+
+process NETWORK [OPEN, CLOSE: Resource] is
+   hide PRED1, PRED2, PRED3, SUCC1, SUCC2, SUCC3: Resource in
+      par
+         PRED1, SUCC1 -> STATION [OPEN, CLOSE, PRED1, SUCC1] (A1, false)
+      || SUCC1, PRED2 -> LINK [SUCC1, PRED2]
+      || PRED2, SUCC2 -> STATION [OPEN, CLOSE, PRED2, SUCC2] (A2, true)
+      || SUCC2, PRED3 -> LINK [SUCC2, PRED3]
+      || PRED3, SUCC3 -> STATION [OPEN, CLOSE, PRED3, SUCC3] (A3, false)
+      || SUCC3, PRED1 -> LINK [SUCC3, PRED1]
+      end par
+   end hide
+end process
+
+Section 4
+---------
+
+process LINK [INPUT, OUTPUT: Ring] is
+  var F : Frame in
+    loop
+      INPUT (?F);
+      OUTPUT (F)
+    end loop
+  end var
+end process
+
+process STATION [OPEN, CLOSE: Resource, PRED, SUCC: Ring]
+                (a: Address, in var init: Bool)
+is
+   loop
+      if not (init) then
+         PRED (TOKEN)
+      end if;
+      init := false;
+      select
+         -- no access to critical section
+         null
+      []
+         -- access to critical section
+         OPEN (a);
+         CLOSE (a)
+      end select;
+      SUCC (TOKEN)
+   end loop
+end process
+
+PROTOCOL_1.lnt is equivalent to SERVICE.lnt.
+
+If no station were priviledged initially, then the system would deadlock
+because then every station would start waiting for the token on the PRED
+gate, while no one would send it. (Check this by modifying your model and
+executing the commands given in the subject.)
+
+If several stations were priviledged initially, then several tokens would
+be circulating in the network, and several stations could be able to access
+the critical section simultaneously.
+
+Section 5
+---------
+
+process LINK [INPUT, OUTPUT: Ring] is
+  var F : Frame in
+    loop
+      INPUT (?F);
+      select
+        -- frame is lost
+        i
+      []
+        -- frame is transmitted
+        OUTPUT (F)
+      end select
+    end loop
+  end var
+end process
+
+PROTOCOL_2.lnt is not anymore equivalent to SERVICE.lnt. If you call
+	check EQUIVALENCE (PROTOCOL_2, FALSE)
+the result will be PASS (systems are not equivalent) and a couter-example
+will be generated in file diag.bcg. The couter-example is a sequence of
+transitions available in both systems, which leads to states that do not
+enable the same actions.
+
+Section 6
+---------
+
+process STATION [OPEN, CLOSE: Resource, PRED, SUCC: Ring]
+                (a: Address, init: Bool)
+is
+  var b, c: Bool, f: Frame in
+    b := any Bool;
+    c := true;
+    loop
+      select
+        PRED (?f);
+        case f in
+        var xa: Address, xb: Bool in
+          TOKEN ->
+            PI [OPEN, CLOSE, SUCC] (a, !?b, !?c)
+        | CLAIM (xa, xb) ->
+            if (xa == a) then
+              if (xb == b) then
+                PI [OPEN, CLOSE, SUCC] (a, !?b, !?c)
+              end if
+            elsif (xa > a) then
+              c := false;
+              SUCC (CLAIM (xa, xb))
+            end if
+        end case
+      []
+        if c then
+          SUCC (CLAIM (a, b))
+        else stop
+        end if
+      end select
+    end loop
+  end var
+end process
+
+process PI [OPEN, CLOSE: Resource, SUCC: Ring]
+           (a: Address, in out b, c: Bool)
+is
+  select
+    null
+  []
+    OPEN (a);
+    CLOSE (a)
+  end select;
+  SUCC (TOKEN);
+  b := not (b);
+  c := true
+end process
+
+PROTOCOL_3.lnt is equivalent to SERVICE.lnt.
+
+Section 7
+---------
+
+Note: the lecture on temporal logic will take place in January 2021.
+
+property MUTUAL_EXCLUSION (LNT_MODEL)
+        "mutual exclusion in $LNT_MODEL"
+is
+        "$LNT_MODEL.lnt" |=
+                [ true* . 'OPEN .*' . (not ('CLOSE .*'))* . 'OPEN .*' ] false ;
+        expected "TRUE"
+end property
+
