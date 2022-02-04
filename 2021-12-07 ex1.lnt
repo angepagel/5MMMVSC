@@ -1,0 +1,91 @@
+module EX1 is
+
+type LIP is list of nat end type
+
+channel comm is
+   (sender : nat, receiver : nat)
+end channel
+
+function empty (lid : LIP) : bool is
+   case lid in
+      nil -> return true
+   |  cons (any nat, any LIP) -> return false
+   end case
+end function
+
+function head (lid : LIP) : nat is
+   case lid
+   var hd : nat in
+      nil -> raise unexpected
+   |  cons (hd, any LIP) -> return hd
+   end case
+end function
+
+function tail (lid : LIP) : LIP is
+   case lid
+   var tl : LIP in
+      nil -> raise unexpected
+   |  cons (any nat, tl) -> return tl
+   end case
+end function
+
+function member (elem : nat, in var lid : LIP) : bool is
+   loop
+      case lid
+      var hd : nat, tl : LIP in
+         nil ->
+            return false
+      |  cons (hd, tl) ->
+            if hd == elem then
+	       return true
+            end if;
+            lid := tl
+      end case
+   end loop
+end function
+
+process node [send, receive : comm] (address : nat, in var lid : LIP) is
+   loop
+      select
+         only if not (empty (lid)) then
+            send (address, head (lid));
+            lid := tail (lid)
+         end if
+      []
+         var exp : nat in
+            receive (?exp, address);
+            lid := cons (exp, lid)
+         end var
+      end select
+   end loop
+end process
+
+process router [send, receive : comm, invalid : none] (known : LIP) is
+   loop
+      var exp, dest : nat in
+         send (?exp, ?dest);
+	 if member (dest, known) and member (exp, known) then
+	    receive (exp, dest)
+	 else
+	    invalid
+	 end if
+      end var
+   end loop
+end process
+
+process Main [send, receive : comm, invalid : none] is
+   par send, receive in
+      par
+	 node [send, receive] (1, {})
+      ||
+         node [send, receive] (2, {1})
+      ||
+         node [send, receive] (3, {})
+      end par
+   ||
+      router [send, receive, invalid] ({1, 2, 3})
+   end par
+end process
+
+end module
+

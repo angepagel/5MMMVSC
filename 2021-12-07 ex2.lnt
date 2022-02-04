@@ -1,0 +1,77 @@
+module EX2 is
+
+channel bool is (value : bool) end channel
+
+process And_gate [Left, Right, Output : bool] is
+   loop
+      var l, r : bool in
+         par Left (?l) || Right (?r) end par;
+         Output (l and r)
+      end var
+   end loop
+end process
+
+process Or_gate [Left, Right, Output : bool] is
+   loop
+      var l, r : bool in
+         par Left (?l) || Right (?r) end par;
+         Output (l or r)
+      end var
+   end loop
+end process
+
+process Not_gate [Input, Output : bool] is
+   loop
+      var b : bool in
+         Input (?b);
+         Output (not (b))
+      end var
+   end loop
+end process
+
+process Wire [Input, Output : bool] is
+   loop
+      var b : bool in
+         Input (?b);
+         Output (b)
+      end var
+   end loop
+end process
+
+process Main [Input_0, Input_1, Input_2 : bool,
+              Output_0, Output_1, Output_2, Output_3 : bool] is
+   hide Output_c, Output_d, Output_e : bool in
+      par
+	 -- porte a
+	 Output_c, Output_e, Output_0 ->
+	    And_gate [Output_c, Output_e, Output_0]
+      ||
+	 -- porte b
+	 Input_0, Input_1, Output_1 ->
+	    And_gate [Input_0, Input_1, Output_1]
+      ||
+	 -- porte c
+	 Input_0, Input_1, Output_c ->
+	    Or_gate [Input_0, Input_1, Output_c]
+      ||
+	 -- porte d
+	 Input_1, Input_2, Output_d ->
+	    Or_gate [Input_1, Input_2, Output_d]
+      ||
+	 -- porte e
+	 Output_1, Output_e ->
+	    Not_gate [Output_1, Output_e]
+      ||
+	 -- porte f
+	 Output_d, Output_2 ->
+	    Not_gate [Output_d, Output_2]
+      ||
+	 -- connexion entree /sortie
+	 Input_2, Output_3 ->
+            Wire [Input_2, Output_3]
+      end par
+   end hide
+end process
+
+end module
+
