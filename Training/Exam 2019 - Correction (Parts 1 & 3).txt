@@ -1,0 +1,186 @@
+I.1
+
+process SPLIT_PAR_2 [INPUT, OUTPUT1, OUTPUT2 : none] is
+   loop
+      INPUT;
+      par OUTPUT1 || OUTPUT2 end par
+   end loop
+end process
+
+process MERGE_PAR_2 [INPUT1, INPUT2, OUTPUT : none] is
+   loop
+      par INPUT1 || INPUT2 end par;
+      OUTPUT
+   end loop
+end process
+
+I.2
+
+process SYNC_1 [L1, L2, L3, L5, L7, L8 : none] is
+   hide L4, L6 : none in
+      par
+         L4 -> MERGE_EXC_2 [L1, L2, L4]
+      || L4, L6 -> SPLIT_EXC_3 [L3, L4, L5, L6]
+      || L6 -> SPLIT_PAR_2 [L6, L7, L8]
+      end par
+   end hide
+end process
+
+I.3
+
+	00 -L3-> 10
+	10 -L4-> 00
+	10 -L5-> 00
+	10 -L6-> 03
+	03 -L3-> 13
+	03 -L7-> 02
+	03 -L8-> 01
+	02 -L3-> 12
+	02 -L8-> 00
+	01 -L3-> 11
+	01 -L7-> 00
+	13 -L4-> 03
+	13 -L5-> 03
+	13 -L7-> 12
+	13 -L8-> 11
+	12 -L4-> 02
+	12 -L5-> 02
+	12 -L8-> 10
+	11 -L4-> 01
+	11 -L5-> 01
+	11 -L7-> 10
+
+I.4
+
+process MAIN [START, MISSION_AUTHORIZATION, FLIGHT_BOOKING, MISSION_PAPERWORK,
+              HOTEL_RESERVATION, INSURANCE, LOCAL_TRANSPORTATION, VACCINATION,
+              VISA_PROCESS, MISSION_ARCHIVE,  FINISH : none] is
+   hide L1, L2, L3, L5, L7, L8, L9, L12, L13, L14, L15, L17, L18, L19,
+        L22, L23 : none in
+      par
+         L2, L3, L7, L8 ->
+            SYNC_1 [L1, L2, L3, L5, L7, L8]
+      || L9, L12, L13, L14, L15 ->
+            SYNC_2 [L9, L12, L13, L14, L15]
+      || L17, L18, L19, L22, L23 ->
+            SYNC_3 [L17, L18, L19, L22, L23]
+      || L2, L3, L7, L8, L9, L12, L13, L14, L15, L17, L18, L19, L22, L23 ->
+            TASKS_EVENTS [...]
+      end par
+   end hide
+end process
+
+II
+
+4 states 0 (initial), 1, 2, 3
+
+0 -- INPUT ; h1 := 0 --> 1
+1 -- h1 >= t1 / OUTPUT1 ; h2 := 0 --> 2
+1 -- h1 >= t1 / OUTPUT2 ; h2 := 0 --> 3
+2 -- h2 >= t2 / OUTPUT2 --> 0
+3 -- h2 >= t2 / OUTPUT1 --> 0
+
+Invariant in states 2 and 3 : h1 <= t3
+
+One should have t1 + t2 <= t3
+otherwise the OUTPUTs cannot be sent
+
+III
+
+Below we provide explanations for pedagogical purpose. You do not have to
+provide explanations in the exam, unless requested explicitly.
+
+1. [ true ] false				5, 6, 7
+
+This formula is satisfied by all states from which every transition leads to
+a state that satisfies false. Only sink states can satisfy this.
+
+2. 〈START ∨ FINISH〉true			0, 2
+
+This formula is satisfied by all states from which there is a transition
+labelled by START or by FINISH.
+
+3. [MISSION_AUTHORIZATION] true			0, ..., 7
+
+This formula is satisfied by all states from which every transition labelled by
+MISSION_AUTHORIZATION leads to a state.
+
+This formula is a tautology (a formula that is true on all models).
+
+4. 〈true∗.FINISH〉true				0, 1, 2, 4
+
+This formula is satisfied by all states from which there exists a sequence of
+transitions ending in FINISH.
+
+
+5. [ true∗.FLIGHT_BOOKING] false		2, 5, 6, 7
+
+This formula is satisfied by all states from which every sequence of
+transitions ending in FLIGHT_BOOKING leads to a state that satisfies false.
+Since there is no state that satisfies false, this formula is satisfied by
+all states from which there is no such sequence of transitions.
+
+6. [ (¬FINISH)∗]〈true∗.FINISH〉true		2
+
+This formula is satisfied by all states from which every sequence of
+transitions not passing through FINISH leads to a state from which there
+exists a sequence of transitions ending in FINISH.
+
+7. μX.[ true ] X				2, 3, 5, 6, 7
+
+This is a least fixed point. We start with X0 = {}.
+
+X1 is the set of states satisfying [true] X0, namely every transition leads
+to a state in the empty set. Only sink states satisfy this, so we have
+X1 = {5, 6, 7}.
+
+X2 is the set of states satisfying [true] X1, namely every transition leads
+to a state in the set {5, 6, 7}, so we have X2 = {2, 3, 5, 6, 7}.
+
+X3 is the set of states satisfying [true] X2, namely every transition leads
+to a state in the set {2, 3, 5, 6, 7}, so we have X3 = X2 (fixed point reached)
+
+Note that the set X3 does not contain state 4 (unlike what was said by error
+in class) because state 4 has a transition to state 1, which is not in X2.
+
+This formula characterizes the states that inevitably lead to a sink state.
+
+8. μX.〈true〉true ∧ [¬FINISH] X		2
+
+This is a least fixed point. We start with X0 = {}
+
+X1 is the set of states satisfying 〈true〉true ∧ [¬FINISH] X0, namely
+there is a transition and every transition not labelled by FINISH leads
+to a state in X0, so we have X1 = {2}.
+
+X2 is the set of states satisfying 〈true〉true ∧ [¬FINISH] X1, namely
+there is a transition and every transition not labelled by FINISH leads
+to a state in X1, so we have X2 = X1 (fixed point reached).
+
+This formula characterizes the states that inevitably lead to FINISH.
+
+9. νX.[FINISH] true ∧ [ true ] X		0, ..., 7
+
+This is a greatest fixed point. We start with X0 = 0..7.
+
+Note that [FINISH] true is a tautology (similar to formula 3), so formula 9
+can be simplified into νX.[ true ] X.
+
+X1 is the set of states satisfying [ true ] X0, namely every transition leads
+to a state in X0, which obviously comprises all states, so we have X1 = X0
+(fixed point reached).
+
+This formula is a tautology.
+
+10. νX.〈MISSION_AUTHORIZATION.true〉X		1
+
+This is a greatest fixed point. We start with X0 = 0..7.
+
+X1 is the set of states satisfying 〈MISSION_AUTHORIZATION.true〉X0, namely
+there exists a sequence of two transitions whose first transition is labelled
+by MISSION_AUTHORIZATION, that leads to a state in X0, so we have X1 = {1}.
+
+X2 is the set of states satisfying 〈MISSION_AUTHORIZATION.true〉X1, namely
+there exists a sequence of two transitions whose first transition is labelled
+by MISSION_AUTHORIZATION, that leads to a state in X1, so we have X1 = X0.
+

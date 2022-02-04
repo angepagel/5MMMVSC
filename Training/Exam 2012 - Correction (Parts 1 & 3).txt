@@ -1,0 +1,286 @@
+=========================================================================
+Correction des questions sur LNT (partie I) et sur la logique temporelle
+(partie III) de l'examen de 2012 et correction de la question sur la
+logique temporelle (partie III) de l'examen de 2013
+=========================================================================
+
+Examen de 2012 - Partie I (LNT)
+-------------------------------
+
+Question 1:
+
+Il fallait noter que les valeurs des variables j et new_i au début de
+chaque itération de la boucle ne changent pas les transitions possibles,
+car ce sont des variables utilisées localement sur certaines transitions.
+On pouvait donc ne considérer dans l'état courant que la valeur de i.
+Le LTS a 3 états correspondant aux cas i=0, i=1, i=2.
+L'état initial est l'état i=2.
+Les transitions sont les suivantes :
+	- depuis i=2:
+		Fetch_and_Store (2, 0) vers i=0
+		Fetch_and_Store (2, 1) vers i=1
+		Fetch_and_Store (2, 2) vers i=2
+		Compare_and_Swap (2, 0, true) vers i=0
+		Compare_and_Swap (2, 1, true) vers i=1
+		Compare_and_Swap (2, 2, true) vers i=2
+		Compare_and_Swap (0, 0, false) vers i=2
+		Compare_and_Swap (0, 1, false) vers i=2
+		Compare_and_Swap (0, 2, false) vers i=2
+		Compare_and_Swap (1, 0, false) vers i=2
+		Compare_and_Swap (1, 1, false) vers i=2
+		Compare_and_Swap (1, 2, false) vers i=2
+	- depuis i=0:
+		Fetch_and_Store (0, 0) vers i=0
+		Fetch_and_Store (0, 1) vers i=1
+		Fetch_and_Store (0, 2) vers i=2
+		Compare_and_Swap (0, 0, true) vers i=0
+		Compare_and_Swap (0, 1, true) vers i=1
+		Compare_and_Swap (0, 2, true) vers i=2
+		Compare_and_Swap (1, 0, false) vers i=0
+		Compare_and_Swap (1, 1, false) vers i=0
+		Compare_and_Swap (1, 2, false) vers i=0
+		Compare_and_Swap (2, 0, false) vers i=0
+		Compare_and_Swap (2, 1, false) vers i=0
+		Compare_and_Swap (2, 2, false) vers i=0
+	- depuis i=1:
+		Fetch_and_Store (1, 0) vers i=0
+		Fetch_and_Store (1, 1) vers i=1
+		Fetch_and_Store (1, 2) vers i=2
+		Compare_and_Swap (1, 0, true) vers i=0
+		Compare_and_Swap (1, 1, true) vers i=1
+		Compare_and_Swap (1, 2, true) vers i=2
+		Compare_and_Swap (0, 0, false) vers i=0
+		Compare_and_Swap (0, 1, false) vers i=0
+		Compare_and_Swap (0, 2, false) vers i=0
+		Compare_and_Swap (1, 0, false) vers i=0
+		Compare_and_Swap (1, 1, false) vers i=0
+		Compare_and_Swap (1, 2, false) vers i=0
+
+Questions 2, 3, 4 : voir le code LNT complet ci-dessous
+
+<<
+module mcs is
+
+type Index is
+  range 0 .. 2 of Nat -- intervalle des entiers de 0 a 2
+  with "==", "!="
+end type
+
+function nil: Index is
+  return Index (2)
+end function
+
+process Lock [Fetch_and_Store, Compare_and_Swap : any] is
+  var i, new_i, j: Index in
+    i := nil;
+    loop
+      select
+        Fetch_and_Store (i, ?new_i);
+        i := new_i
+      []
+        Compare_and_Swap (?j, ?new_i, true) where (i == j);
+        i := new_i
+      []
+        Compare_and_Swap (?j, ?new_i, false) where (i != j)
+        -- on ignore new_i
+      end select
+    end loop
+  end var
+end process
+
+process Memory [Read_next, Write_next, Read_locked, Write_locked : any] is
+   par
+      Next [Read_next, Write_next] (Index (0))
+   || Locked [Read_locked, Write_locked] (Index (0))
+   || Next [Read_next, Write_next] (Index (1))
+   || Locked [Read_locked, Write_locked] (Index (1))
+   end par
+end process
+
+process Locked [Read, Write : any] (pid : Index) is
+  var locked : Bool in
+    locked := false;
+    loop
+      select
+        Read (pid, locked)
+      []
+        Write (pid, ?locked)
+      end select
+    end loop
+  end var
+end process 
+
+process Next [Read, Write : any] (pid : Index) is
+  var next : Index in
+    next := nil;
+    loop
+      select
+        Read (pid, next)
+      []
+        Write (pid, ?next)
+      end select
+    end loop
+  end var
+end process 
+
+process release_lock [Read_next, Write_next, Read_locked, Write_locked,
+                      Fetch_and_Store, Compare_and_Swap : any] (pid: Index) is
+  var next: Index, swap: Bool in
+    Read_next (pid, ?next);
+    if next == nil then
+      Compare_and_Swap (pid, nil, ?swap);
+      if swap == false then
+        loop L in
+          Read_next (pid, ?next);
+          if next != nil then break L end if
+        end loop;
+        Write_locked (next, false)
+      end if
+    else
+      Write_locked (next, false)
+    end if
+  end var
+end process
+
+process release_lock_0 [Read_next, Write_next, Read_locked, Write_locked,
+                        Fetch_and_Store, Compare_and_Swap : any] is
+  release_lock [Read_next, Write_next, Read_locked, Write_locked,
+                Fetch_and_Store, Compare_and_Swap] (Index (0))
+end process
+
+process acquire_lock [Read_next, Write_next, Read_locked, Write_locked,
+                      Fetch_and_Store, Compare_and_Swap : any] (pid: Index) is
+  var predecessor : Index, locked : Bool in
+    Write_next (pid, nil);
+    Fetch_and_store (?predecessor, pid);
+    if predecessor != nil then
+      Write_locked (pid, true);
+      Write_next (predecessor, pid);
+      loop L in
+        Read_locked (pid, ?locked);
+        if not (locked) then break L end if
+      end loop
+    end if
+  end var
+end process
+
+process acquire_lock_0 [Read_next, Write_next, Read_locked, Write_locked,
+                        Fetch_and_Store, Compare_and_Swap : any] is
+  acquire_lock [Read_next, Write_next, Read_locked, Write_locked,
+                  Fetch_and_Store, Compare_and_Swap] (Index (0))
+end process
+
+process Agent [NCS, CS, Read_next, Write_next, Read_locked, Write_locked,
+               Fetch_and_Store, Compare_and_Swap : any] (pid: Index) is
+  loop
+    NCS (pid);
+    acquire_lock [Read_next, Write_next, Read_locked, Write_locked,
+                  Fetch_and_Store, Compare_and_Swap] (pid);
+    CS (pid);
+    release_lock [Read_next, Write_next, Read_locked, Write_locked,
+                  Fetch_and_Store, Compare_and_Swap] (pid)
+  end loop
+end process
+
+process Agent_0 [NCS, CS, Read_next, Write_next, Read_locked, Write_locked,
+                 Fetch_and_Store, Compare_and_Swap : any] is
+  Agent [NCS, CS, Read_next, Write_next, Read_locked, Write_locked,
+         Fetch_and_Store, Compare_and_Swap] (Index (0))
+end process
+
+process Agent_1 [NCS, CS, Read_next, Write_next, Read_locked, Write_locked,
+                 Fetch_and_Store, Compare_and_Swap : any] is
+  Agent [NCS, CS, Read_next, Write_next, Read_locked, Write_locked,
+         Fetch_and_Store, Compare_and_Swap] (Index (1))
+end process
+
+process Main [NCS, CS : any] is
+  hide Read_next, Write_next, Read_locked, Write_locked, Fetch_and_Store, Compare_and_Swap : any in
+    par Read_next, Write_next, Read_locked, Write_locked, Fetch_and_Store, Compare_and_Swap in
+      par
+        Agent [NCS, CS, Read_next, Write_next, Read_locked, Write_locked,
+               Fetch_and_Store, Compare_and_Swap] (Index (0))
+        ||
+        Agent [NCS, CS, Read_next, Write_next, Read_locked, Write_locked,
+               Fetch_and_Store, Compare_and_Swap] (Index (1))
+      end par
+    ||
+      par
+        Memory [Read_next, Write_next, Read_locked, Write_locked]
+      ||
+        Lock [Fetch_and_Store, Compare_and_Swap]
+      end par
+    end par
+  end hide
+end process
+
+end module
+>>
+
+=========================================================================
+
+Examen de 2012 - Partie III (Logique temporelle)
+------------------------------------------------
+
+1. <IN> tt
+	Il existe une transition IN
+	menant à un état satisfaisant tt (c-a-d n'importe quel état)
+	=> 0, 1, 2
+2. [OUT] ff
+	Toute transition OUT
+	mène à un état satisfaisant ff (c-a-d aucun état)
+	Les états satisfaisant cette propriété sont donc ceux à partir
+	qui n'ont pas de transition OUT
+	=> 3
+	(cette formule est équivalente à : not <OUT> tt
+3. [IN] [IN] [ERROR] ff
+	Toute transition IN
+	mène à un état dont toute transition IN
+	mène à un état dont toute transition ERROR
+	mène à un état qui satisfait ff (c-a-d aucun état)
+	Les états satisfaisant cette propriété sont donc ceux à partir
+	desquels il n'existe pas la séquence de transitions IN.IN.ERROR
+	=> 0, 2, 3
+4. [ERROR] tt
+	Toute transition ERROR
+	mène à un état satisfaisant tt (c-a-d n'importe quel état)
+	=> 0, 1, 2, 3
+	(cette formule est une tautologie, c-a-d équivalente à tt)
+5. <IN> [¬ERROR] <OUT> tt
+	Il existe une transition IN
+	menant à un état dont toute transition autre que ERROR
+	mène à un état qui a une transition IN
+	(qui mène à un état)
+	=> 0, 2
+6. nu X . <IN> X
+	Il s'agit d'un point fixe maximal, donc initialement X s'interprète
+	comme l'ensemble de tous les états : O, 1, 2, 3 (on note X0 cet
+	ensemble).
+	On itère jusqu'au point fixe en partant de X0.
+	Lors de la i-ème itération, on calcule Xi contenant les états
+	qui ont une transition IN menant à un état qui appartient à Xi-1.
+	- Première itération : X1 = {0, 1, 2}
+	- Deuxième itération : X2 = {0, 1}
+	- Troisième itération : X3 = {0}
+	- Quatrième itération : X4 = {} (point fixe)
+	=> aucun état ne satisfait cette formule qui caractérise les états
+	à partir desquels il existe une séquence infinie de IN
+7. [¬ERROR] νX . <IN> <OUT> X
+	Toute transition autre que ERROR mène à un état à partir duquel
+	il existe une séquence infinie de transitions IN.OUT.IN.OUT...
+	=> 0, 1
+8. mu X . <IN> X or <ERROR> tt
+	Il s'agit d'un point fixe minimal, donc initialement X s'interprète
+	comme l'ensemble vide (on note X0 cet ensemble).
+	On itère jusqu'au point fixe en partant de X0.
+	Lors de la i-ème itération, on calcule Xi contenant les états
+	qui ont une transition IN menant à un état qui appartient à Xi-1
+	ou qui ont une transition ERROR.
+	- Première itération : X1 = {3}
+	- Deuxième itération : X2 = {2, 3}
+	- Troisième itératuon : X3 = {1, 2, 3}
+	- Quatrième itération : X4 = {0, 1, 2, 3} (point fixe)
+	=> tous les états satisont cette formule qui caractérise les états
+	à partir desquels il existe une séquence de transition de la forme
+	IN*.ERROR	
+

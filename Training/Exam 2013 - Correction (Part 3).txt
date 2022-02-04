@@ -1,0 +1,30 @@
+=========================================================================
+
+Examen de 2013 - Partie III (Logique temporelle)
+------------------------------------------------
+
+1. <ACCESS> tt
+	=> 0
+2. [ACK] ff
+	=> 0, 1, 3, 4, 5
+3. [SNOOP] tt
+	=> tous (tautologie)
+4. [tt*] <tt* . REQUEST> tt
+	=> tous
+	(états depuis lesquels tout les états atteignables satisfont:
+	l'action REQUEST est atteignable) 
+5. [SNOOP . (¬RESPONSE)* . SNOOP] ff
+	=> tous
+	(états depuis lesquels il n'est pas possible de faire deux SNOOP
+	sans au moins une RESPONSE entre temps)
+6. mu X . <OK> tt or <ACCESS> X
+	=> 0, 1, 3
+	(équivalent à < ACCESS* . OK > tt)
+7. mu X . <OK> X
+	=> aucun état
+	cette formule est toujours fausse car initialement X est vide
+	(point fixe minimal)
+8. nu X . <SNOOP . RESPONSE> X
+	=> 0, 1
+	(il existe une séquence infinie de la forme
+	SNOOP.RESPONSE.SNOOP.RESPONSE...)
