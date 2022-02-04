@@ -1,0 +1,18 @@
+(* It is inevitable to execute an action satisfying action formula A *)
+
+macro INEVITABLE (A) =
+    mu X . (< true > true and [ not (A) ] X)
+end_macro
+
+(* An action satisfying action formula A is fairly reachable *)
+
+macro FAIR (A) =
+    [ (not (A))* ] < (not (A))* . (A) > true
+end_macro
+
+(* There exists a sequence consisting of the infinite repetition
+ * of subsequences satisfying the regular formula R *)
+
+macro CYCLE (R) =
+    nu X . < (R) > X
+end_macro

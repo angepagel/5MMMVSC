@@ -1,0 +1,51 @@
+module Buffer is
+
+-- Data items to be stored in the buffer cells
+
+type Bit is
+    range 0 .. 1 of Nat
+end type
+
+-- Channels for synchronization and communication
+
+channel Null_Channel is
+    ()
+end channel
+
+channel Bit_Channel is
+   (Bit)
+end channel
+
+-- Two-cell buffer
+
+process Main [PUT:Bit_Channel, GET:Bit_Channel, LOSS:Null_Channel] is
+    hide COM:Bit_Channel in
+        par
+            COM -> Cell [PUT, COM, LOSS]
+        ||  COM -> Cell [COM, GET, LOSS]
+        end par
+    end hide
+end process
+
+-- Buffer cell
+
+process Cell [PUT:Bit_Channel, GET:Bit_Channel, LOSS:Null_Channel] is
+    var n:Bit, empty:Bool in
+        n := 0;
+        empty := true;
+        loop
+            if empty then
+                PUT (?n)
+            else
+                select
+                    LOSS    (* modeling unreliable communication *)
+                    []
+                    GET (n)
+                end select
+            end if;
+            empty := not (empty)
+        end loop
+    end var
+end process
+
+end module

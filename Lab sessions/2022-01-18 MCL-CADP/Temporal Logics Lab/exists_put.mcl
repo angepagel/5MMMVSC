@@ -1,0 +1,6 @@
+<
+    true* .
+    "PUT !0" .
+    (not ("PUT !0" or "PUT !1"))* .
+    "PUT !1"
+> true
